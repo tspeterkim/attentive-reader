@@ -155,7 +155,7 @@ if __name__ == '__main__':
     args.test_file = 'data/cnn/test.txt'
     args.dev_file = 'data/cnn/dev.txt'
 
-    args.log_file = None
+    args.log_file = 'log/log.txt'
     args.debug = True
 
     args.embedding_file = 'data/glove.6B/glove.6B.50d.txt'
@@ -175,6 +175,10 @@ if __name__ == '__main__':
 
     if args.log_file is None:
         logging.basicConfig(level=logging.DEBUG,
+                            format='%(asctime)s %(message)s', datefmt='%m-%d %H:%M')
+    else:
+        logging.basicConfig(filename=args.log_file,
+                            filemode='w', level=logging.DEBUG,
                             format='%(asctime)s %(message)s', datefmt='%m-%d %H:%M')
 
     main(args)

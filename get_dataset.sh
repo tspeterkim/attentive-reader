@@ -1,9 +1,9 @@
 #!/bin/bash
 
 DATASETS_DIR = "data/"
-mkdir -p $DATASETS_DIR
+mkdir -p "$DATASETS_DIR"
 
-cd $DATASETS_DIR
+cd "$DATASETS_DIR"
 
 # Get CNN/DM Dataset
 wget http://cs.stanford.edu/~danqi/data/cnn.tar.gz

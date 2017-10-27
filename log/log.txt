@@ -1,0 +1,39 @@
+10-25 23:59 --------------------------------------------------
+10-25 23:59 Loading data...
+10-25 23:59 # of Examples: 100
+10-25 23:59 # of Examples: 100
+10-25 23:59 --------------------------------------------------
+10-25 23:59 Building dictionary...
+10-25 23:59 # of Words: 8325 -> 8325
+10-25 23:59 ('the', 4399)
+10-25 23:59 (',', 4044)
+10-25 23:59 ('.', 3356)
+10-25 23:59 ('"', 2181)
+10-25 23:59 ('to', 1992)
+10-25 23:59 ...
+10-25 23:59 ('inviting', 1)
+10-25 23:59 ('rejoins', 1)
+10-25 23:59 ('till', 1)
+10-25 23:59 ('chaired', 1)
+10-25 23:59 ('lacked', 1)
+10-25 23:59 # of Entity Markers: 372
+10-25 23:59 --------------------------------------------------
+10-25 23:59 Generating embedding...
+10-25 23:59 Embedding Matrix: 8327 x 50
+10-25 23:59 Loading embedding file at data/glove.6B/glove.6B.50d.txt
+10-25 23:59 Pre-trained: 7887 (94.72%)
+10-25 23:59 --------------------------------------------------
+10-25 23:59 Creating TF computation graph...
+10-25 23:59 Done!
+10-25 23:59 --------------------------------------------------
+10-25 23:59 Initial Test...
+10-25 23:59 Vectorization: processed 0 / 100
+10-25 23:59 Dev Accuracy: 0.00 %
+10-25 23:59 --------------------------------------------------
+10-25 23:59 Start training...
+10-25 23:59 Vectorization: processed 0 / 100
+10-25 23:59 Batch Size = 32, # of Examples = 32, max_len = 548
+10-25 23:59 Epoch = 0, Iter = 0 (max = 4), Loss = 2.77, Elapsed Time = 3.33 (s)
+10-25 23:59 Batch Size = 32, # of Examples = 32, max_len = 1697
+10-25 23:59 Epoch = 0, Iter = 1 (max = 4), Loss = 3.67, Elapsed Time = 9.44 (s)
+10-25 23:59 Batch Size = 32, # of Examples = 32, max_len = 923

@@ -103,7 +103,7 @@ def main(args):
     logging.info('Initial Test...')
     dev_x1, dev_x2, dev_l, dev_y = utils.vectorize(dev_examples, word_dict, entity_dict)
     all_dev = gen_examples(dev_x1, dev_x2, dev_l, dev_y, args.batch_size)
-    # first dev accuracy displays here
+    # TODO: first dev accuracy displays here
     dev_acc = 0.
     logging.info('Dev Accuracy: %.2f %%' % dev_acc)
     best_acc = dev_acc
@@ -114,8 +114,9 @@ def main(args):
     all_train = gen_examples(train_x1, train_x2, train_l, train_y, args.batch_size)
 
     init = tf.global_variables_initializer()
+    saver = tf.train.Saver()
     start_time = time.time()
-    n_updates = 0
+    n_updates = -1
     with tf.Session() as sess:
         sess.run(init)
         for e in range(args.num_epoches):
@@ -133,6 +134,7 @@ def main(args):
                 n_updates += 1
 
                 if n_updates % args.eval_iter == 0:
+                    saver.save(sess, args.model_path, global_step=e)
                     correct = 0
                     n_examples = 0
                     for d_x1, d_mask1, d_x2, d_mask2, d_l, d_y in all_dev:
@@ -145,6 +147,10 @@ def main(args):
                         logging.info('Best Dev Accuracy: epoch = %d, n_updates (iter) = %d, acc = %.2f %%' %
                                         (e, n_updates, dev_acc))
 
+        logging.info('-'*50)
+        logging.info('Training Finished...')
+        logging.info("Model saved in file: %s" % saver.save(sess, args.model_path))
+
 
 
 if __name__ == '__main__':
@@ -155,16 +161,19 @@ if __name__ == '__main__':
     args.test_file = 'data/cnn/test.txt'
     args.dev_file = 'data/cnn/dev.txt'
 
-    args.log_file = 'log/log.txt'
-    args.debug = True
+    args.log_file = 'log/log.txt' # if not specifed, prints all info to console
+    args.log_file = None
+    args.debug = True # if true, use only the first 100 training/dev examples
 
     args.embedding_file = 'data/glove.6B/glove.6B.50d.txt'
     args.embedding_size = utils.get_dim(args.embedding_file)
 
+    args.model_path = "model/attreader"
+
     args.batch_size = 32
     args.num_epoches = 100
     args.eval_iter = 100
-    args.hidden_size = 256
+    args.hidden_size = 128
     args.num_layers = 1
     args.bidir = True
     args.att_func = 'bilinear'

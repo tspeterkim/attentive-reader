@@ -61,23 +61,37 @@ def main(args):
     l_mask = tf.placeholder(dtype=tf.float32, shape=(None, None), name="l_mask") # [batch_size, entity num]
     y = tf.placeholder(dtype=tf.int32, shape=None, name="label") # batch size vector
     y_1hot= tf.placeholder(dtype=tf.float32, shape=(None, None), name="label_1hot") # onehot encoding of y [batch_size, entitydict]
-
+    training = tf.placeholder(dtype=tf.bool)
 
     W_bilinear = tf.Variable(tf.random_normal([2*args.hidden_size, 2*args.hidden_size])) # TODO: random_normal?
 
     with tf.variable_scope('d_encoder'):
-        d_embed = tf.nn.embedding_lookup(embeddings, d_input)
-        d_cell_fw = rnn.LSTMCell(args.hidden_size) # TODO: Dropout of 0.2
-        d_cell_bw = rnn.LSTMCell(args.hidden_size)
-        d_outputs, _ = tf.nn.bidirectional_dynamic_rnn(d_cell_fw, d_cell_bw, d_embed, dtype=tf.float32)
-        d_output = tf.concat(d_outputs, 2) # (batch, len, h)
+        d_embed = tf.nn.embedding_lookup(embeddings, d_input) # [batch, max_seq_length_for_batch, 50]
+        d_embed_dropout = tf.layers.dropout(d_embed, rate=args.dropout_rate, training=training)
+        if args.rnn_type == 'lstm':
+            d_cell_fw = rnn.LSTMCell(args.hidden_size) # TODO: Dropout of 0.2
+            d_cell_bw = rnn.LSTMCell(args.hidden_size)
+        elif args.rnn_type == 'gru':
+            d_cell_fw = rnn.GRUCell(args.hidden_size)
+            d_cell_bw = rnn.GRUCell(args.hidden_size)
+
+        d_outputs, _ = tf.nn.bidirectional_dynamic_rnn(d_cell_fw, d_cell_bw, d_embed_dropout, dtype=tf.float32)
+        d_output = tf.concat(d_outputs, axis=-1) # (batch, len, h)
 
     with tf.variable_scope('q_encoder'):
         q_embed = tf.nn.embedding_lookup(embeddings, q_input)
-        q_cell_fw = rnn.LSTMCell(args.hidden_size)
-        q_cell_bw = rnn.LSTMCell(args.hidden_size)
-        q_outputs, q_laststates = tf.nn.bidirectional_dynamic_rnn(q_cell_fw, q_cell_bw, q_embed, dtype=tf.float32)
-        q_output = tf.concat([q_laststates[0][-1], q_laststates[1][-1]], axis=-1) # (batch, h)
+        d_embed_dropout = tf.layers.dropout(q_embed, rate=args.dropout_rate, training=training)
+        if args.rnn_type == 'lstm':
+            q_cell_fw = rnn.LSTMCell(args.hidden_size)
+            q_cell_bw = rnn.LSTMCell(args.hidden_size)
+        elif args.rnn_type == 'gru':
+            q_cell_fw = rnn.GRUCell(args.hidden_size)
+            q_cell_bw = rnn.GRUCell(args.hidden_size)
+        q_outputs, q_laststates = tf.nn.bidirectional_dynamic_rnn(q_cell_fw, q_cell_bw, d_embed_dropout, dtype=tf.float32)
+        if args.rnn_type == 'lstm':
+            q_output = tf.concat([q_laststates[0][-1], q_laststates[1][-1]], axis=-1) # (batch, h)
+        elif args.rnn_type == 'gru':
+            q_output = tf.concat(q_laststates, axis=-1) # (batch, h)
 
     with tf.variable_scope('bilinear'):
         M = tf.expand_dims(tf.matmul(q_output, W_bilinear), axis=1) # [batch, h] -> [batch, 1, h]
@@ -116,7 +130,7 @@ def main(args):
     init = tf.global_variables_initializer()
     saver = tf.train.Saver()
     start_time = time.time()
-    n_updates = -1
+    n_updates = 0
     with tf.Session() as sess:
         sess.run(init)
         for e in range(args.num_epoches):
@@ -128,7 +142,7 @@ def main(args):
                 for r, i in enumerate(mb_y): # convert (batch) -> (batch, entity_size)
                     y_label[r][i] = 1.
 
-                train_loss = sess.run(loss_op, feed_dict={d_input:mb_x1, q_input:mb_x2, y_1hot: y_label, l_mask: mb_l})
+                train_loss = sess.run(loss_op, feed_dict={d_input:mb_x1, q_input:mb_x2, y_1hot: y_label, l_mask: mb_l, training: True})
                 logging.info('Epoch = %d, Iter = %d (max = %d), Loss = %.2f, Elapsed Time = %.2f (s)' %
                                 (e, idx, len(all_train), train_loss, time.time() - start_time))
                 n_updates += 1
@@ -138,7 +152,7 @@ def main(args):
                     correct = 0
                     n_examples = 0
                     for d_x1, d_mask1, d_x2, d_mask2, d_l, d_y in all_dev:
-                        correct += sess.run(acc, feed_dict = {d_input:mb_x1, q_input:mb_x2, y: mb_y, l_mask: mb_l})
+                        correct += sess.run(acc, feed_dict = {d_input:mb_x1, q_input:mb_x2, y: mb_y, l_mask: mb_l, training: False})
                         n_examples += len(d_x1)
                     dev_acc = correct * 100. / n_examples
                     logging.info('Dev Accuracy: %.2f %%' % dev_acc)
@@ -162,7 +176,7 @@ if __name__ == '__main__':
     args.dev_file = 'data/cnn/dev.txt'
 
     args.log_file = 'log/log.txt' # if not specifed, prints all info to console
-    args.log_file = None
+    # args.log_file = None
     args.debug = True # if true, use only the first 100 training/dev examples
 
     args.embedding_file = 'data/glove.6B/glove.6B.50d.txt'
@@ -181,6 +195,7 @@ if __name__ == '__main__':
     args.optimizer = 'sgd'
     args.learning_rate = 0.1
     args.dropout_rate = 0.2
+    args.rnn_type = 'gru' # or 'lstm'
 
     if args.log_file is None:
         logging.basicConfig(level=logging.DEBUG,

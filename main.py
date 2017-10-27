@@ -80,14 +80,14 @@ def main(args):
 
     with tf.variable_scope('q_encoder'):
         q_embed = tf.nn.embedding_lookup(embeddings, q_input)
-        d_embed_dropout = tf.layers.dropout(q_embed, rate=args.dropout_rate, training=training)
+        q_embed_dropout = tf.layers.dropout(q_embed, rate=args.dropout_rate, training=training)
         if args.rnn_type == 'lstm':
             q_cell_fw = rnn.LSTMCell(args.hidden_size)
             q_cell_bw = rnn.LSTMCell(args.hidden_size)
         elif args.rnn_type == 'gru':
             q_cell_fw = rnn.GRUCell(args.hidden_size)
             q_cell_bw = rnn.GRUCell(args.hidden_size)
-        q_outputs, q_laststates = tf.nn.bidirectional_dynamic_rnn(q_cell_fw, q_cell_bw, d_embed_dropout, dtype=tf.float32)
+        q_outputs, q_laststates = tf.nn.bidirectional_dynamic_rnn(q_cell_fw, q_cell_bw, q_embed_dropout, dtype=tf.float32)
         if args.rnn_type == 'lstm':
             q_output = tf.concat([q_laststates[0][-1], q_laststates[1][-1]], axis=-1) # (batch, h)
         elif args.rnn_type == 'gru':

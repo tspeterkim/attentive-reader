@@ -117,8 +117,8 @@ def main(args):
     logging.info('Initial Test...')
     dev_x1, dev_x2, dev_l, dev_y = utils.vectorize(dev_examples, word_dict, entity_dict)
     all_dev = gen_examples(dev_x1, dev_x2, dev_l, dev_y, args.batch_size)
-    # TODO: first dev accuracy displays here
-    dev_acc = 0.
+
+    dev_acc = 0. # TODO: first dev accuracy displays here
     logging.info('Dev Accuracy: %.2f %%' % dev_acc)
     best_acc = dev_acc
 
@@ -152,7 +152,7 @@ def main(args):
                     correct = 0
                     n_examples = 0
                     for d_x1, d_mask1, d_x2, d_mask2, d_l, d_y in all_dev:
-                        correct += sess.run(acc, feed_dict = {d_input:mb_x1, q_input:mb_x2, y: mb_y, l_mask: mb_l, training: False})
+                        correct += sess.run(acc, feed_dict = {d_input:d_x1, q_input:d_x2, y: d_y, l_mask: d_l, training: False})
                         n_examples += len(d_x1)
                     dev_acc = correct * 100. / n_examples
                     logging.info('Dev Accuracy: %.2f %%' % dev_acc)

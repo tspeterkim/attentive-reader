@@ -55,6 +55,12 @@ def main(args):
 
     logging.info('-'* 50)
     logging.info('Creating TF computation graph...')
+
+    if args.rnn_type == 'lstm':
+        logging.info('Using LSTM Cells')
+    elif args.rnn_type == 'gru':
+        logging.info('Using GRU Cells')
+
     # tf.reset_default_graph()
     d_input = tf.placeholder(dtype=tf.int32, shape=(None, None), name="d_input")
     q_input = tf.placeholder(dtype=tf.int32, shape=(None, None), name="q_input") # [batch_size, max_seq_length_for_batch]
@@ -63,7 +69,7 @@ def main(args):
     y_1hot= tf.placeholder(dtype=tf.float32, shape=(None, None), name="label_1hot") # onehot encoding of y [batch_size, entitydict]
     training = tf.placeholder(dtype=tf.bool)
 
-    W_bilinear = tf.Variable(tf.random_normal([2*args.hidden_size, 2*args.hidden_size])) # TODO: random_normal?
+    W_bilinear = tf.Variable(tf.random_uniform((2*args.hidden_size, 2*args.hidden_size), minval=-0.01, maxval=0.01))
 
     with tf.variable_scope('d_encoder'):
         d_embed = tf.nn.embedding_lookup(embeddings, d_input) # [batch, max_seq_length_for_batch, 50]
@@ -72,7 +78,7 @@ def main(args):
             d_cell_fw = rnn.LSTMCell(args.hidden_size) # TODO: Dropout of 0.2
             d_cell_bw = rnn.LSTMCell(args.hidden_size)
         elif args.rnn_type == 'gru':
-            d_cell_fw = rnn.GRUCell(args.hidden_size)
+            d_cell_fw = rnn.GRUCell(args.hidden_size) # TODO: kernel_initializer=tf.random_normal_initializer(0,0.1) not working for 1.1
             d_cell_bw = rnn.GRUCell(args.hidden_size)
 
         d_outputs, _ = tf.nn.bidirectional_dynamic_rnn(d_cell_fw, d_cell_bw, d_embed_dropout, dtype=tf.float32)
@@ -99,7 +105,7 @@ def main(args):
         bilinear_output = tf.reduce_sum(d_output * tf.expand_dims(alpha, axis=2), axis=1) # [batch]
 
     with tf.variable_scope('dense'):
-        final_prob = tf.layers.dense(bilinear_output, units=args.num_labels, activation=tf.nn.softmax) # [batch, entity#]
+        final_prob = tf.layers.dense(bilinear_output, units=args.num_labels, activation=tf.nn.softmax, kernel_initializer=tf.random_uniform_initializer(minval=-0.01, maxval=0.01)) # [batch, entity#]
 
     pred = final_prob * l_mask # ignore entities that don't appear in the passage
     train_pred = pred / tf.expand_dims(tf.reduce_sum(pred, axis=1), axis=1) # redistribute probabilities ignoring certain labels

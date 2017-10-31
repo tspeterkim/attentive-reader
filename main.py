@@ -1,3 +1,4 @@
+import sys
 import time
 import logging
 import config
@@ -119,6 +120,10 @@ def main(args):
     train_op = optimizer.minimize(loss_op)
     logging.info('Done!')
 
+    logging.info('-' * 50)
+    logging.info('Printing args...')
+    logging.info(args)
+
     logging.info('-'* 50)
     logging.info('Initial Test...')
     dev_x1, dev_x2, dev_l, dev_y = utils.vectorize(dev_examples, word_dict, entity_dict)
@@ -175,33 +180,49 @@ def main(args):
 
 if __name__ == '__main__':
     args = config.get_args()
+    np.random.seed(1234)
+
+    if args.train_file is None:
+        raise ValueError('training file is not specified!')
+
+    if args.dev_file is None:
+        raise ValueError('dev file is not specified!')
+
+    if args.embedding_file is not None:
+        dim = utils.get_dim(args.embedding_file)
+        if (args.embedding_size is not None) and (args.embedding_size != dim):
+            raise ValueError('embedding_size = %d, but %s has %d dims.' %
+                             (args.embedding_size, args.embedding_file, dim))
+        args.embedding_size = dim
+    elif args.embedding_size is None:
+        raise RuntimeError('Either embedding_file or embedding_size needs to be specified.')
 
     # TODO: move this to config.py
-    args.train_file = 'data/cnn/train.txt'
-    args.test_file = 'data/cnn/test.txt'
-    args.dev_file = 'data/cnn/dev.txt'
+    # args.train_file = 'data/cnn/train.txt'
+    # args.test_file = 'data/cnn/test.txt'
+    # args.dev_file = 'data/cnn/dev.txt'
 
-    args.log_file = 'log/log.txt' # if not specifed, prints all info to console
+    # args.log_file = 'log/log.txt' # if not specifed, prints all info to console
     # args.log_file = None
-    args.debug = True # if true, use only the first 100 training/dev examples
+    # args.debug = True # if true, use only the first 100 training/dev examples
 
-    args.embedding_file = 'data/glove.6B/glove.6B.50d.txt'
-    args.embedding_size = utils.get_dim(args.embedding_file)
+    # args.embedding_file = 'data/glove.6B/glove.6B.50d.txt'
+    # args.embedding_size = utils.get_dim(args.embedding_file)
 
-    args.model_path = "model/attreader"
+    # args.model_path = "model/attreader"
 
-    args.batch_size = 32
-    args.num_epoches = 100
-    args.eval_iter = 100
-    args.hidden_size = 128
-    args.num_layers = 1
-    args.bidir = True
-    args.att_func = 'bilinear'
-    args.grad_clipping = 10.0
-    args.optimizer = 'sgd'
-    args.learning_rate = 0.1
-    args.dropout_rate = 0.2
-    args.rnn_type = 'gru' # or 'lstm'
+    # args.batch_size = 32
+    # args.num_epoches = 100
+    # args.eval_iter = 100
+    # args.hidden_size = 128
+    # args.num_layers = 1
+    # args.bidir = True
+    # args.att_func = 'bilinear'
+    # args.grad_clipping = 10.0
+    # args.optimizer = 'sgd'
+    # args.learning_rate = 0.1
+    # args.dropout_rate = 0.2
+    # args.rnn_type = 'gru' # or 'lstm'
 
     if args.log_file is None:
         logging.basicConfig(level=logging.DEBUG,
@@ -210,5 +231,6 @@ if __name__ == '__main__':
         logging.basicConfig(filename=args.log_file,
                             filemode='w', level=logging.DEBUG,
                             format='%(asctime)s %(message)s', datefmt='%m-%d %H:%M')
+    logging.info(' '.join(sys.argv))
 
     main(args)

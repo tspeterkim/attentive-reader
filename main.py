@@ -73,9 +73,9 @@ def main(args):
 
     with tf.variable_scope('d_encoder'):
         d_embed = tf.nn.embedding_lookup(embeddings, d_input) # [batch, max_seq_length_for_batch, 50]
-        d_embed_dropout = tf.layers.dropout(d_embed, rate=args.dropout_rate, training=training)
+        d_embed_dropout = tf.layers.dropout(d_embed, rate=args.dropout_rate, training=training) # TODO: gradient clipping
         if args.rnn_type == 'lstm':
-            d_cell_fw = rnn.LSTMCell(args.hidden_size) # TODO: Dropout of 0.2
+            d_cell_fw = rnn.LSTMCell(args.hidden_size)
             d_cell_bw = rnn.LSTMCell(args.hidden_size)
         elif args.rnn_type == 'gru':
             d_cell_fw = rnn.GRUCell(args.hidden_size) # TODO: kernel_initializer=tf.random_normal_initializer(0,0.1) not working for 1.1
@@ -148,7 +148,7 @@ def main(args):
                 for r, i in enumerate(mb_y): # convert (batch) -> (batch, entity_size)
                     y_label[r][i] = 1.
 
-                train_loss = sess.run(loss_op, feed_dict={d_input:mb_x1, q_input:mb_x2, y_1hot: y_label, l_mask: mb_l, training: True})
+                _, train_loss = sess.run([train_op, loss_op], feed_dict={d_input:mb_x1, q_input:mb_x2, y_1hot: y_label, l_mask: mb_l, training: True})
                 logging.info('Epoch = %d, Iter = %d (max = %d), Loss = %.2f, Elapsed Time = %.2f (s)' %
                                 (e, idx, len(all_train), train_loss, time.time() - start_time))
                 n_updates += 1

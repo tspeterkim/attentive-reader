@@ -10,7 +10,7 @@ def get_args():
     parser.add_argument('--debug',
                         type='bool',
                         default=True,
-                        help='whether it is debug mode')
+                        help='whether it is debug mode i.e. use only first 100 examples')
 
     parser.add_argument('--test_only',
                         type='bool',
@@ -27,9 +27,14 @@ def get_args():
                         default='data/cnn/dev.txt',
                         help='Development file')
 
+    parser.add_argument('--test_file',
+                        type=str,
+                        default='data/cnn/test.txt',
+                        help='Test file')
+
     parser.add_argument('--model_path',
                         type=str,
-                        default='model/attreader',
+                        default='model/attreader.ckpt',
                         help='Model path to save TF checkpoints')
 
     parser.add_argument('--log_file',

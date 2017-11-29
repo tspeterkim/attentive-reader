@@ -70,11 +70,13 @@ def main(args):
     y_1hot= tf.placeholder(dtype=tf.float32, shape=(None, None), name="label_1hot") # onehot encoding of y [batch_size, entitydict]
     training = tf.placeholder(dtype=tf.bool)
 
+    word_embeddings = tf.get_variable("glove", shape=(args.vocab_size, args.embedding_size), initializer=tf.constant_initializer(embeddings))
+
     W_bilinear = tf.Variable(tf.random_uniform((2*args.hidden_size, 2*args.hidden_size), minval=-0.01, maxval=0.01))
 
-    with tf.variable_scope('d_encoder'):
-        d_embed = tf.nn.embedding_lookup(embeddings, d_input) # [batch, max_seq_length_for_batch, 50]
-        d_embed_dropout = tf.layers.dropout(d_embed, rate=args.dropout_rate, training=training) # TODO: gradient clipping
+    with tf.variable_scope('d_encoder'): # Encoding Step for Passage (d_ for document)
+        d_embed = tf.nn.embedding_lookup(word_embeddings, d_input) # Apply embeddings: [batch, max passage length in batch, GloVe Dim]
+        d_embed_dropout = tf.layers.dropout(d_embed, rate=args.dropout_rate, training=training) # Apply Dropout to embedding layer
         if args.rnn_type == 'lstm':
             d_cell_fw = rnn.LSTMCell(args.hidden_size)
             d_cell_bw = rnn.LSTMCell(args.hidden_size)
@@ -83,10 +85,10 @@ def main(args):
             d_cell_bw = rnn.GRUCell(args.hidden_size)
 
         d_outputs, _ = tf.nn.bidirectional_dynamic_rnn(d_cell_fw, d_cell_bw, d_embed_dropout, dtype=tf.float32)
-        d_output = tf.concat(d_outputs, axis=-1) # (batch, len, h)
+        d_output = tf.concat(d_outputs, axis=-1) # [batch, len, h], len is the max passage length, and h is the hidden size
 
-    with tf.variable_scope('q_encoder'):
-        q_embed = tf.nn.embedding_lookup(embeddings, q_input)
+    with tf.variable_scope('q_encoder'): # Encoding Step for Question
+        q_embed = tf.nn.embedding_lookup(word_embeddings, q_input)
         q_embed_dropout = tf.layers.dropout(q_embed, rate=args.dropout_rate, training=training)
         if args.rnn_type == 'lstm':
             q_cell_fw = rnn.LSTMCell(args.hidden_size)
@@ -100,17 +102,21 @@ def main(args):
         elif args.rnn_type == 'gru':
             q_output = tf.concat(q_laststates, axis=-1) # (batch, h)
 
-    with tf.variable_scope('bilinear'):
-        M = tf.expand_dims(tf.matmul(q_output, W_bilinear), axis=1) # [batch, h] -> [batch, 1, h]
-        alpha = tf.nn.softmax(tf.reduce_sum(d_output * M, axis=2)) # [batch, len]
-        bilinear_output = tf.reduce_sum(d_output * tf.expand_dims(alpha, axis=2), axis=1) # [batch]
+    with tf.variable_scope('bilinear'): # Bilinear Layer (Attention Step)
+        # M computes the similarity between each passage word and the entire question encoding
+        M = d_output * tf.expand_dims(tf.matmul(q_output, W_bilinear), axis=1) # [batch, h] -> [batch, 1, h]
+        # alpha represents the normalized weights representing how relevant the passage word is to the question
+        alpha = tf.nn.softmax(tf.reduce_sum(M, axis=2)) # [batch, len]
+        # this output contains the weighted combination of all contextual embeddings
+        bilinear_output = tf.reduce_sum(d_output * tf.expand_dims(alpha, axis=2), axis=1) # [batch, h]
 
-    with tf.variable_scope('dense'):
+    with tf.variable_scope('dense'): # Prediction Step
+        # the final output has dimension [batch, entity#], giving the probabilities of an entity being the answer for examples
         final_prob = tf.layers.dense(bilinear_output, units=args.num_labels, activation=tf.nn.softmax, kernel_initializer=tf.random_uniform_initializer(minval=-0.01, maxval=0.01)) # [batch, entity#]
 
     pred = final_prob * l_mask # ignore entities that don't appear in the passage
     train_pred = pred / tf.expand_dims(tf.reduce_sum(pred, axis=1), axis=1) # redistribute probabilities ignoring certain labels
-    train_pred = tf.clip_by_value(train_pred, 1e-7, 1.0 - 1e-7) # TODO: why these values exactly?
+    train_pred = tf.clip_by_value(train_pred, 1e-7, 1.0 - 1e-7)
 
     test_pred = tf.cast(tf.argmax(pred, axis=-1), tf.int32)
     acc = tf.reduce_sum(tf.cast(tf.equal(test_pred, y), tf.int32))
@@ -133,13 +139,37 @@ def main(args):
     logging.info('Dev Accuracy: %.2f %%' % dev_acc)
     best_acc = dev_acc
 
+    saver = tf.train.Saver()
+
+    logging.info('-'* 50)
+    logging.info('Testing...')
+    if args.test_only:
+        if args.test_file == None:
+            return ValueError("No test file specified")
+        test_examples = utils.load_data(args.test_file)
+        test_x1, test_x2, test_l, test_y = utils.vectorize(test_examples, word_dict, entity_dict)
+        all_test = gen_examples(test_x1, test_x2, test_l, test_y, args.batch_size)
+        with tf.Session() as sess:
+            # saver = tf.train.import_meta_graph(args.model_path + '.meta')
+            saver.restore(sess, args.model_path)
+            # TODO: which file to restore?
+
+            correct = 0
+            n_examples = 0
+            for t_x1, t_mask1, t_x2, t_mask2, t_l, t_y in all_test:
+                correct += sess.run(acc, feed_dict = {d_input:t_x1, q_input:t_x2, y: t_y, l_mask: t_l, training: False})
+                n_examples += len(t_x1)
+            test_acc = correct * 100. / n_examples
+            logging.info('Test Accuracy: %.2f %%' % test_acc)
+        return
+
     logging.info('-'*50)
     logging.info('Start training...')
     train_x1, train_x2, train_l, train_y = utils.vectorize(train_examples, word_dict, entity_dict)
     all_train = gen_examples(train_x1, train_x2, train_l, train_y, args.batch_size)
 
     init = tf.global_variables_initializer()
-    saver = tf.train.Saver()
+
     start_time = time.time()
     n_updates = 0
     with tf.Session() as sess:
@@ -196,33 +226,6 @@ if __name__ == '__main__':
         args.embedding_size = dim
     elif args.embedding_size is None:
         raise RuntimeError('Either embedding_file or embedding_size needs to be specified.')
-
-    # TODO: move this to config.py
-    # args.train_file = 'data/cnn/train.txt'
-    # args.test_file = 'data/cnn/test.txt'
-    # args.dev_file = 'data/cnn/dev.txt'
-
-    # args.log_file = 'log/log.txt' # if not specifed, prints all info to console
-    # args.log_file = None
-    # args.debug = True # if true, use only the first 100 training/dev examples
-
-    # args.embedding_file = 'data/glove.6B/glove.6B.50d.txt'
-    # args.embedding_size = utils.get_dim(args.embedding_file)
-
-    # args.model_path = "model/attreader"
-
-    # args.batch_size = 32
-    # args.num_epoches = 100
-    # args.eval_iter = 100
-    # args.hidden_size = 128
-    # args.num_layers = 1
-    # args.bidir = True
-    # args.att_func = 'bilinear'
-    # args.grad_clipping = 10.0
-    # args.optimizer = 'sgd'
-    # args.learning_rate = 0.1
-    # args.dropout_rate = 0.2
-    # args.rnn_type = 'gru' # or 'lstm'
 
     if args.log_file is None:
         logging.basicConfig(level=logging.DEBUG,
